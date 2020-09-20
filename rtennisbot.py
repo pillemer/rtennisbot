@@ -1,8 +1,4 @@
-import time, praw, requests, pandas as pd
-
-
-# added text
-
+import time, praw, requests, json, pandas as pd
 
 def main():
     # reddit api authentication
@@ -22,14 +18,15 @@ def main():
         if keyphrase in comment.body and comment.id not in already_responded:
             already_responded.append(comment.id)
             player = comment.body.replace(keyphrase, '')
-            points = find_points(player)
+            ranking_points = get_ranking_points(player)
+            race_points = get_race_points(player)
             try:
-                if points:
-                    reply = f'you mentioned {player}, he currently has {points} ranking points.'
+                if ranking_points:
+                    reply = f'you mentioned {player}, he currently has {ranking_points} ranking points and {race_points} race points'
                     comment.reply(reply)
                     print(f'posted: ({reply}) to comment {comment.id}.')
                 else:
-                    reply = f'''{player} is not an active player or has no ranking points.
+                    reply = f'''{player} is not an active player.
                     Are you sure you spelled the name correcly?'''
                     comment.reply(reply)
                     print(f'posted: ({reply}) to comment {comment.id}.')
@@ -40,8 +37,8 @@ def main():
                 print(e)
 
 
-# find current ranking points from atp website
-def find_points(player):
+# find current ranking points from scraping atp website
+def get_ranking_points(player):
     url = 'https://www.atptour.com/en/rankings/singles?&rankRange=1-5000'
     html = requests.get(url).content
     df_list = pd.read_html(html)
@@ -52,5 +49,21 @@ def find_points(player):
     else:
         return player.iloc[0]['Points']
 
+# find current race points useing API
+def get_race_points(player):
+    url = "https://tennis-live-data.p.rapidapi.com/rankings/race/ATP"
+
+    headers = {
+        'x-rapidapi-host': "tennis-live-data.p.rapidapi.com",
+        'x-rapidapi-key': "b959b7f4e4msh4dbb30d178cbca2p19d665jsn323d6128e891"}
+
+    response = requests.request("GET", url, headers=headers)
+    response_json = response.json()
+    for item in response_json['results']['rankings']:
+        if item['full_name'] == player.title():
+            return item['race_points']
+    return None
+
 if __name__ == '__main__':
     main()
+
